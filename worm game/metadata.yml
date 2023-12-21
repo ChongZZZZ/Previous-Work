@@ -1,0 +1,14 @@
+---
+:id: 201343195
+:submitters:
+- :name: Sauryanshu (Saury) Khanal
+  :email: khanalsa@grinnell.edu
+- :name: Chong Zhao
+  :email: zhaochon@grinnell.edu
+:created_at: !ruby/object:ActiveSupport::TimeWithZone
+  utc: 2023-10-11 02:31:43.126228000 Z
+  zone: !ruby/object:ActiveSupport::TimeZone
+    name: America/Los_Angeles
+  time: 2023-10-10 19:31:43.126228000 Z
+:status: processed
+:score: 100.0
