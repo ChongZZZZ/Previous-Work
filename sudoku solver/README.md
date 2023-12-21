@@ -12,7 +12,7 @@ _This project_ implements a program that uses the GPU to solve sudoku puzzles. T
  ### Instruction
  After making the file, running
  ```
-./sudoku inputs/huge.csv
+./sudoku inputs/medium.csv
 ```
 The user can solve the sudoku puzzles included in the inputs files
 
