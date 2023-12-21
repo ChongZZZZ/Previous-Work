@@ -1,0 +1,20 @@
+- Make a readme file
+- Make the powerpoint
+
+
+CHECK:
+- Add a check for if player 2 enters the wrong board size in the multiplayer version
+- Do documentaiton
+
+
+- Implement: you will first choose whether to play with x's or o's
+
+
+
+ On multiplayer, the o got 3 in a row first. The winner checking function doesn't check for it.
+
+
+- If we have time, add support for a board where spaces have 2-digit numbers,
+  like in a 20x20 board for example. 
+        - MAX_MESSAGE (larger)
+        - input read in to read 2 digit and 2 digit
