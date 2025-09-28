@@ -1,0 +1,261 @@
+---
+title: "STAFinalProject"
+output:
+  pdf_document: default
+  html_document: default
+date: "2024-04-17"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+require(leaps)
+data = read.csv("/Users/zhaochong/Desktop/STA336/cancer.csv")
+data$SMOKING = as.factor(data$SMOKING)
+data$YELLOW_FINGERS = as.factor(data$YELLOW_FINGERS)
+data$ANXIETY = as.factor(data$ANXIETY)
+data$PEER_PRESSURE= as.factor(data$PEER_PRESSURE)
+data$CHRONIC.DISEASE= as.factor(data$CHRONIC.DISEASE)
+data$FATIGUE= as.factor(data$FATIGUE)
+data$WHEEZING= as.factor(data$WHEEZING)
+data$ALCOHOL.CONSUMING= as.factor(data$ALCOHOL.CONSUMING)
+data$COUGHING= as.factor(data$COUGHING)
+data$SHORTNESS.OF.BREATH= as.factor(data$SHORTNESS.OF.BREATH)
+data$SWALLOWING.DIFFICULTY= as.factor(data$SWALLOWING.DIFFICULTY)
+data$CHEST.PAIN= as.factor(data$CHEST.PAIN)
+data$LUNG_CANCER= as.factor(data$LUNG_CANCER)
+
+```
+
+```{r}
+# Load necessary library for combinations
+if (!requireNamespace("combinat", quietly = TRUE)) {
+    install.packages("combinat")
+}
+library(combinat)
+
+# Define the function to fit logistic regression and calculate AIC
+fit_logistic <- function(predictors, data, response = "LUNG_CANCER") {
+    formula <- as.formula(paste(response, "~", paste(predictors, collapse = "+")))
+    model <- glm(formula, data = data, family = "binomial")
+    return(AIC(model))
+}
+
+# Prepare the data and define predictors
+predictors <- names(data)[names(data) != "LUNG_CANCER"]  # Exclude the response variable from predictors
+
+# Generate all possible combinations of predictors, up to 5 predictors
+subsets <- list()
+max_predictors <- min(5, length(predictors))  # Limit to 5 predictors or fewer if there are not enough predictors
+for (k in 1:max_predictors) {
+    subsets[[k]] <- combn(predictors, k, simplify = FALSE)
+}
+subsets <- unlist(subsets, recursive = FALSE)
+
+# Evaluate all subsets using the AIC of logistic regression
+aic_values <- sapply(subsets, function(subset) {
+    fit_logistic(subset, data = data, response = "LUNG_CANCER")
+})
+
+# Identify the best model based on the lowest AIC
+best_model_index <- which.min(aic_values)
+best_subset <- subsets[[best_model_index]]
+
+# Fit the best logistic regression model
+final_model <- glm(as.formula(paste("LUNG_CANCER ~", paste(best_subset, collapse = "+"))), data = data, family = "binomial")
+summary(final_model)
+
+
+```
+
+
+```{r}
+data2=data
+data2$LUNG_CANCER <- as.numeric(data$LUNG_CANCER)-1
+data2$YELLOW_FINGERS <- as.numeric(data$YELLOW_FINGERS)-1
+data2$PEER_PRESSURE <- as.numeric(data$PEER_PRESSURE)-1
+data2$FATIGUE <- as.numeric(data$FATIGUE)-1
+data2$ALLERGY <- as.numeric(data$ALLERGY)-1
+data2$ALCOHOL.CONSUMING <- as.numeric(data$ALCOHOL.CONSUMING)-1
+
+final_model <- glm(LUNG_CANCER~YELLOW_FINGERS+PEER_PRESSURE+FATIGUE+ALLERGY+ALCOHOL.CONSUMING, data=data2,family = "binomial")
+summary(final_model)
+```
+
+
+
+```{r}
+# Adjusted Log-Likelihood function for logistic regression
+log_likelihood <- function(beta, data) {
+   
+    eta <- beta[1] + beta[2] * data$YELLOW_FINGERS + beta[3] * data$PEER_PRESSURE +
+       beta[4] * data$FATIGUE + beta[5] * data$ALLERGY + beta[6] * data$ALCOHOL.CONSUMING
+    
+    #print(paste("eta", eta))
+    
+    p <- 1 / (1 + exp(-eta))
+
+    # Adjust probabilities to avoid 0 or 1
+    p <- pmin(pmax(p, 1e-10), 1 - 1e-10)
+
+    # Calculate the log-likelihood
+    likelihood_value <- sum(dbinom(data$LUNG_CANCER, size = 1, prob = p, log = TRUE))
+    return(likelihood_value)
+}
+
+# Define the prior distribution (normal in this case)
+log_prior <- function(beta, mean = 0, sd = 50) {
+    sum(dnorm(beta, mean = mean, sd = sd, log = TRUE))
+}
+
+# Metropolis-Hastings algorithm
+# Metropolis-Hastings algorithm with enhanced debugging
+metropolis_hastings <- function(data, iterations, init_beta, proposal_sd) {
+    chain <- matrix(NA, nrow = iterations, ncol = length(init_beta))
+    chain[1,] <- init_beta
+
+    for (i in 2:iterations) {
+        current_beta <- chain[i-1,]
+        proposed_beta <- rnorm(length(current_beta), mean = current_beta, sd = proposal_sd)
+        
+        current_likelihood <- log_likelihood(current_beta, data)
+        #print(paste("Current likelihood:", current_likelihood))
+        proposed_likelihood <- log_likelihood(proposed_beta, data)
+        #print(paste("proposed likelihood:", proposed_likelihood))
+        current_prior <- log_prior(current_beta)
+        #print(paste("current_prior:", current_prior))
+        proposed_prior <- log_prior(proposed_beta)
+        #print(paste("proposed_prior:", proposed_prior))
+        
+        log_acceptance_ratio <- proposed_likelihood + proposed_prior - current_likelihood - current_prior
+
+        
+        if (log(runif(1)) < log_acceptance_ratio) {
+            chain[i,] <- proposed_beta
+        } else {
+            chain[i,] <- current_beta
+        }
+    }
+    return(chain)
+}
+
+
+```
+
+
+# Fine Tuning
+```{r}
+
+# Calculate acceptance rate
+# Initial proposal standard deviation
+proposal_sd <- 0.1  # Start with a reasonable guess
+
+# Run the MH algorithm
+chain <- metropolis_hastings(data = data2, iterations = 10000, init_beta = rep(0, 6), proposal_sd = proposal_sd)
+
+# Calculate acceptance rate
+acceptance_rate <- mean(diff(chain) != 0)
+
+# Adjust proposal_sd based on the acceptance rate
+if (acceptance_rate < 0.2) {
+    proposal_sd <- proposal_sd * 0.5  # Decrease if too few acceptances
+} else if (acceptance_rate > 0.5) {
+    proposal_sd <- proposal_sd * 2  # Increase if too many acceptances
+}
+```
+
+```{r}
+# Parameters
+init_beta <- c(-3,0,0,0,0,0)
+proposal_sd <- rep(0.4, 6)
+iterations <- 500000
+
+# Run five separate chains
+chains <- list()
+for (j in 1:5) {
+    chains[[j]] <- metropolis_hastings(data2, iterations, init_beta, proposal_sd)
+}
+```
+
+```{r}
+
+par(mfrow = c(2, 3))
+
+hist(chains[[1]][,1], col = "lightgreen", breaks=50,border = "black",xlab = "b0", ylab = "Density", main = "chain 1", freq = FALSE)
+abline(v = -3.3346, col = "red", lwd = 2) 
+hist(chains[[2]][,1], col = "lightgreen", breaks=30,border = "black",xlab = "b0", ylab = "Density", main = "chain 2", freq = FALSE)
+hist(chains[[3]][,1], col = "lightgreen", breaks=30,border = "black",xlab = "b0", ylab = "Density", main = "chain 3", freq = FALSE)
+hist(chains[[4]][,1], col = "lightgreen", breaks=30,border = "black",xlab = "b0", ylab = "Density", main = "chain 4", freq = FALSE)
+hist(chains[[5]][,1], col = "lightgreen",  breaks=30,border = "black",xlab = "b0", ylab = "Density", main = "chain 5", freq = FALSE)
+
+par(mfrow = c(2, 3))
+hist(chains[[1]][,2], col = "lightgreen",breaks=30, border = "black",xlab = "b1", ylab = "Density", main = "chain 1", freq = FALSE)
+abline(v = 2.7642, col = "red", lwd = 2) 
+hist(chains[[2]][,2], col = "lightgreen",breaks=30, border = "black",xlab = "b1", ylab = "Density", main = "chain 2", freq = FALSE)
+hist(chains[[3]][,2], col = "lightgreen",breaks=30, border = "black",xlab = "b1", ylab = "Density", main = "chain 3", freq = FALSE)
+hist(chains[[4]][,2], col = "lightgreen",breaks=30, border = "black",xlab = "b1", ylab = "Density", main = "chain 4", freq = FALSE)
+hist(chains[[5]][,2], col = "lightgreen",breaks=30,border = "black",xlab = "b1", ylab = "Density", main = "chain 5", freq = FALSE)
+
+par(mfrow = c(2, 3))
+hist(chains[[1]][,3], col = "lightgreen",breaks=30, border = "black",xlab = "b2", ylab = "Density", main = "chain 1", freq = FALSE)
+abline(v = 1.4921, col = "red", lwd = 2) 
+hist(chains[[2]][,3], col = "lightgreen",breaks=30, border = "black",xlab = "b2", ylab = "Density", main = "chain 2", freq = FALSE)
+hist(chains[[3]][,3], col = "lightgreen",breaks=30, border = "black",xlab = "b2", ylab = "Density", main = "chain 3", freq = FALSE)
+hist(chains[[4]][,3], col = "lightgreen",breaks=30, border = "black",xlab = "b2", ylab = "Density", main = "chain 4", freq = FALSE)
+hist(chains[[5]][,3], col = "lightgreen",breaks=30, border = "black",xlab = "b2", ylab = "Density", main = "chain 5", freq = FALSE)
+
+
+par(mfrow = c(2, 3))
+
+hist(chains[[1]][,4], col = "lightgreen",breaks=30, border = "black",xlab = "b3", ylab = "Density", main = "chain 1", freq = FALSE)
+abline(v = 2.4, col = "red", lwd = 2) 
+hist(chains[[2]][,4], col = "lightgreen",breaks=30, border = "black",xlab = "b3", ylab = "Density", main = "chain 2", freq = FALSE)
+hist(chains[[3]][,4], col = "lightgreen",breaks=30, border = "black",xlab = "b3", ylab = "Density", main = "chain 3", freq = FALSE)
+hist(chains[[4]][,4], col = "lightgreen",breaks=30, border = "black",xlab = "b3", ylab = "Density", main = "chain 4", freq = FALSE)
+hist(chains[[5]][,4], col = "lightgreen",breaks=30, border = "black",xlab = "b3", ylab = "Density", main = "chain 5", freq = FALSE)
+
+par(mfrow = c(2, 3))
+
+hist(chains[[1]][,5], col = "lightgreen",breaks=30, border = "black",xlab = "b4", ylab = "Density", main = "chain 1", freq = FALSE)
+abline(v = 2.5, col = "red", lwd = 2) 
+hist(chains[[2]][,5], col = "lightgreen",breaks=30, border = "black",xlab = "b4", ylab = "Density", main = "chain 2", freq = FALSE)
+hist(chains[[3]][,5], col = "lightgreen",breaks=30, border = "black",xlab = "b4", ylab = "Density", main = "chain 3", freq = FALSE)
+hist(chains[[4]][,5], col = "lightgreen",breaks=30, border = "black",xlab = "b4", ylab = "Density", main = "chain 4", freq = FALSE)
+hist(chains[[5]][,5], col = "lightgreen",breaks=30, border = "black",xlab = "b4", ylab = "Density", main = "chain 4", freq = FALSE)
+
+par(mfrow = c(2, 3))
+hist(chains[[1]][,6], col = "lightgreen",breaks=30, border = "black",xlab = "b5", ylab = "Density", main = "chain 1", freq = FALSE)
+abline(v = 2.8, col = "red", lwd = 2) 
+hist(chains[[2]][,6], col = "lightgreen",breaks=30, border = "black",xlab = "b5", ylab = "Density", main = "chain 2", freq = FALSE)
+hist(chains[[3]][,6], col = "lightgreen",breaks=30, border = "black",xlab = "b5", ylab = "Density", main = "chain 3", freq = FALSE)
+hist(chains[[4]][,6], col = "lightgreen",breaks=30, border = "black",xlab = "b5", ylab = "Density", main = "chain 4", freq = FALSE)
+hist(chains[[5]][,6], col = "lightgreen",breaks=30, border = "black",xlab = "b5", ylab = "Density", main = "chain 4", freq = FALSE)
+  
+```
+
+
+
+
+
+
+```{r}
+# Calculate 95% credible interval for each coefficient
+credible_intervals <- lapply(chains, function(chain) {
+  apply(chain, 2, function(col) quantile(col, c(0.025, 0.975)))
+})
+
+# Print the credible intervals
+for (i in 1:length(credible_intervals)) {
+  cat("Chain", i, "credible intervals:\n")
+  print(credible_intervals[[i]])
+}
+
+```
+
+```{r}
+favstats(chains[[2]][,1])
+```
+
