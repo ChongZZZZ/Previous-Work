@@ -19,6 +19,7 @@ Each folder in the repository has their own makefile, which detailedly explains 
 
 ## Python & LLMs
 * [GEPA Merge Diagnostic](GEPA%20Merge%20Diagnostic) (_NLP / LLM Prompt Optimization: 98-cell merge-operator sweep, mechanism-level diagnostic, adaptive behaviorally-gated merge policy_)
+* [Harness](harness) (_Coding Agents: concurrent task scheduling, model handoffs, context compaction, and cost-aware evaluation_)
 
 ## Python & Flask
 * Smart Scheduler (_Webpage, RL, and Recommendation System_)

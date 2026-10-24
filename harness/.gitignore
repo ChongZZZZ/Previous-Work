@@ -1,0 +1,11 @@
+.env
+.env.*
+!.env.example
+__pycache__/
+*.pyc
+.DS_Store
+.cache/
+a3_logs/
+*.tar.gz
+src.zip
+claude-sessions*
